@@ -1,0 +1,30 @@
+# Local development infrastructure. Start with: docker compose up -d
+# Values like ${POSTGRES_USER} are read from the .env file next to this file
+# (Docker Compose loads it automatically). Copy .env.example to .env first.
+services:
+  postgres:
+    # Pin an exact version so every developer and CI run use the same database.
+    # Upgrading Postgres then becomes a deliberate, reviewable one-line change.
+    image: postgres:18.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      # Bind to 127.0.0.1 only, so the database isn't reachable from your
+      # network (a plain "5432:5432" listens on every interface).
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # A named volume keeps the data when the container is removed and recreated.
+      # Postgres 18+ images expect the volume at /var/lib/postgresql (older ones used .../data).
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # $$ escapes $ so the variable expands inside the container, not in Compose.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

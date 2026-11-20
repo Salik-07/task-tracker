@@ -1,0 +1,12 @@
+# Extra settings for local development, applied on top of application.yaml.
+# Activate with: ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+spring:
+  config:
+    # Load POSTGRES_* from .env, the same file Docker Compose reads.
+    import: file:.env[.properties]
+
+management:
+  endpoint:
+    health:
+      # Show each check (e.g. "db": UP) at /actuator/health. Dev only.
+      show-details: always

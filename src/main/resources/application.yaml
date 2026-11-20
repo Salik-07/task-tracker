@@ -1,3 +1,10 @@
+# Settings shared by every environment.
+# ${NAME} is filled in from an environment variable (or from .env in the dev profile).
 spring:
   application:
     name: task-tracker
+
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
