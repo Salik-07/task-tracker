@@ -46,8 +46,8 @@ A senior MERN/MEAN engineer is learning the Java ecosystem. The goal is a produc
 | 1 | **Project setup:** install JDK 21, generate the project with Spring Initializr, `git init`, `.gitignore`, a tour of auto-configuration, and CLAUDE.md | ✅ Done |
 | 2 | **PostgreSQL in Docker:** `compose.yaml` with `postgres` (pinned version, named volume, healthcheck, `.env` credentials), datasource config, profiles, env-var overrides, and an Actuator health check | ✅ Done |
 | 3 | **Schema and entities:** Flyway `V1__init.sql` (tables, foreign key, indexes, check constraints), the JPA entities, entity lifecycle, lazy loading, and auditing (`@CreationTimestamp` vs. Spring Data auditing). Config: `jpa.hibernate.ddl-auto: validate` | ✅ Done |
-| 4 | **Repositories:** Spring Data interfaces, derived queries, pagination, and the N+1 problem with how to avoid it | ⏭️ Next |
-| 5 | **Service layer:** business rules, `@Transactional` boundaries, interface vs. implementation, and why the service owns the transaction. Config: `jpa.open-in-view: false` | |
+| 4 | **Repositories:** Spring Data interfaces, derived queries, pagination, and the N+1 problem with how to avoid it | ✅ Done |
+| 5 | **Service layer:** business rules, `@Transactional` boundaries, interface vs. implementation, and why the service owns the transaction. Config: `jpa.open-in-view: false` | ⏭️ Next |
 | 6 | **DTOs, mappers and controllers:** request and response records, REST endpoints, status codes and `ResponseEntity` | |
 | 7 | **Validation and exception handling:** `@Valid`, custom messages, the global handler, and a consistent error response | |
 | 8 | **Testing:** unit tests (JUnit 5, Mockito, AssertJ), `@WebMvcTest` slices, and `@DataJpaTest`/`@SpringBootTest` with **Testcontainers** against real Postgres | |
@@ -70,10 +70,10 @@ The phases for later steps are a **draft**. They get refined at the start of eac
 - [x] **3.5 Schema validation:** turn on `ddl-auto: validate`, break a mapping on purpose to see the error, then the entity lifecycle (transient, managed, detached, removed) and `@CreationTimestamp` vs. Spring Data auditing.
 
 ### Step 4: Repositories
-- [ ] **4.1 Basic repositories:** `TaskListRepository` and `TaskRepository` extending `JpaRepository`, and what Spring generates behind the interface.
-- [ ] **4.2 Queries scoped to a list:** derived queries such as `findByIdAndTaskListId` and `findByTaskListId(Pageable)`, plus `Page` vs. `Slice`.
-- [ ] **4.3 Filtering:** optional status and priority filters (derived queries vs. `@Query` vs. Specifications, and which one to pick).
-- [ ] **4.4 N+1:** turn on SQL logging in the dev profile, reproduce N+1, then fix it with `@EntityGraph` or `JOIN FETCH`.
+- [x] **4.1 Basic repositories:** `TaskListRepository` and `TaskRepository` extending `JpaRepository`, and what Spring generates behind the interface.
+- [x] **4.2 Queries scoped to a list:** derived queries such as `findByIdAndTaskListId` and `findByTaskListId(Pageable)`, plus `Page` vs. `Slice`. (`findByTaskListId` was later replaced by the `inList` specification in 4.3.)
+- [x] **4.3 Filtering:** optional status and priority filters (derived queries vs. `@Query` vs. Specifications, and which one to pick).
+- [x] **4.4 N+1:** turn on SQL logging in the dev profile, reproduce N+1, then fix it with `@EntityGraph` or `JOIN FETCH`.
 
 ### Step 5: Service layer
 - [ ] **5.1 `TaskListService`:** interface + implementation for CRUD, and `ResourceNotFoundException` in `common/`.
@@ -163,6 +163,19 @@ The phases for later steps are a **draft**. They get refined at the start of eac
 - Notes: `docs/notes/04-jpa-relationships.pdf` (owning vs. inverse side, syncing both sides, LAZY proxies, cascade, `orphanRemoval`).
 - Verified: Flyway applies V1, the `CHECK` rejects a blank title, and `./mvnw clean verify` passes.
 - One expected startup warning remains until step 5: `spring.jpa.open-in-view is enabled by default`.
+
+## Step 4: what was done
+
+- `TaskListRepository` and `TaskRepository` extend `JpaRepository<Entity, UUID>`. Spring Data generates the implementation at startup.
+- `TaskRepository.findByIdAndTaskListId`: a derived query, so a task is only found through its own list (later a 404 otherwise).
+- Filtering uses **Specifications**: `TaskRepository` also extends `JpaSpecificationExecutor`, and `TaskSpecifications` has `inList`, `hasStatus` and `hasPriority`. A null filter returns `Specification.unrestricted()`. Used as `findAll(inList(id).and(hasStatus(s)).and(hasPriority(p)), pageable)`, which returns a `Page` (with a total count).
+- `findByTaskListId(Pageable)` from 4.2 was removed: `inList(id)` with no filters does the same job.
+- SQL logging in the dev profile: `org.hibernate.SQL: debug` and `org.hibernate.orm.jdbc.bind: trace`.
+- N+1: `TaskListRepository.findAllWithTasksBy()` uses `@EntityGraph(attributePaths = "tasks")` to load lists and tasks in one query. Don't combine it with `Pageable` (in-memory paging).
+- `NPlusOneDemoTests` counts statements with Hibernate Statistics: `findAll` + lazy tasks = 1 + N, `findAllWithTasksBy` = 1. Tests roll back, so no data is left behind.
+- Notes: `docs/notes/05-repositories.pdf` (repositories, free methods, `save`, transactions, `Optional`).
+- Verified: `./mvnw clean verify` passes (3 tests). A temporary check confirmed every filter combination and the list scoping, then was deleted.
+- Trade-off noted: specification attribute names are strings; a generated metamodel (`Task_.status`) could make them type-safe later.
 
 ## Verification (each step)
 

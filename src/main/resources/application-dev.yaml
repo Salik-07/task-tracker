@@ -10,3 +10,11 @@ management:
     health:
       # Show each check (e.g. "db": UP) at /actuator/health. Dev only.
       show-details: always
+
+logging:
+  level:
+    # Log every SQL statement Hibernate runs, through the normal logger
+    # (spring.jpa.show-sql would print to stdout instead, with no timestamps).
+    org.hibernate.SQL: debug
+    # Also log the values bound to each ? in those statements.
+    org.hibernate.orm.jdbc.bind: trace
