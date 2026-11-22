@@ -8,3 +8,9 @@ spring:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema. Hibernate only checks at startup that every entity
+      # matches its table, and refuses to start if not. It never creates or alters tables.
+      ddl-auto: validate

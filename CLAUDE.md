@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose and working style
 
-This is a **learning project**. The owner is a senior Node/React/Angular engineer learning Spring Boot by building a production-grade REST backend. Work **one roadmap step at a time**:
+This is a **learning project**. The owner is a senior Node/React/Angular engineer learning Spring Boot by building a production-grade REST backend. Work **one phase at a time**. Each roadmap step is split into phases (for example 3.1, 3.2) listed in `plan.md`:
 - Explain the concepts and the reasoning behind each decision. Compare with Node/Express equivalents where that helps.
-- Write the code for that step only, then stop for the owner to run and review it.
+- Write the code for that phase only, then stop for the owner to run, review and ask questions. Start the next phase only when the owner says so.
+- Before starting a step, refine its draft phases in `plan.md` if the earlier code changed the picture. Tick off each phase in `plan.md` once it's reviewed.
 - Don't generate later steps ahead of time. This includes config: add a setting only in the step that uses it, and never restate a Spring Boot default. `plan.md` notes which step brings each deferred setting back.
 
 The full roadmap (steps 1–12: Docker Postgres → schema/entities → repositories → services → controllers/DTOs → validation/errors → tests → docs/logging → security/JWT → containerization/CI) lives in `plan.md`. Update its status table when a step is completed.
@@ -41,4 +42,4 @@ The app needs a reachable PostgreSQL to start or to pass `@SpringBootTest`: Data
 - Errors are handled by a global `@RestControllerAdvice` that returns `ProblemDetail` (RFC 9457).
 - The schema is owned by **Flyway** migrations in `src/main/resources/db/migration`, and Hibernate runs with `ddl-auto: validate`. Never let Hibernate generate the schema.
 - Config goes in `application.yaml` plus profile files (`application-dev.yaml`). Secrets come from environment variables or `.env`, which is git-ignored.
-- No Lombok for now. It's a deliberate later addition.
+- Lombok is used, but only `@Getter`, `@Setter` (per field where needed) and constructor annotations on entities. Never use `@Data`, `@EqualsAndHashCode` or `@ToString` on entities.
