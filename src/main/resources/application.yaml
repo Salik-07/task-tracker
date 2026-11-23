@@ -14,3 +14,8 @@ spring:
       # Flyway owns the schema. Hibernate only checks at startup that every entity
       # matches its table, and refuses to start if not. It never creates or alters tables.
       ddl-auto: validate
+    # Off: the database session closes when the service's transaction ends, not
+    # when the HTTP response is written. Touching a LAZY relation outside a
+    # transaction then fails fast (LazyInitializationException) instead of quietly
+    # running extra queries from the controller or JSON serializer.
+    open-in-view: false

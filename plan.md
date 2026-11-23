@@ -47,8 +47,8 @@ A senior MERN/MEAN engineer is learning the Java ecosystem. The goal is a produc
 | 2 | **PostgreSQL in Docker:** `compose.yaml` with `postgres` (pinned version, named volume, healthcheck, `.env` credentials), datasource config, profiles, env-var overrides, and an Actuator health check | ✅ Done |
 | 3 | **Schema and entities:** Flyway `V1__init.sql` (tables, foreign key, indexes, check constraints), the JPA entities, entity lifecycle, lazy loading, and auditing (`@CreationTimestamp` vs. Spring Data auditing). Config: `jpa.hibernate.ddl-auto: validate` | ✅ Done |
 | 4 | **Repositories:** Spring Data interfaces, derived queries, pagination, and the N+1 problem with how to avoid it | ✅ Done |
-| 5 | **Service layer:** business rules, `@Transactional` boundaries, interface vs. implementation, and why the service owns the transaction. Config: `jpa.open-in-view: false` | ⏭️ Next |
-| 6 | **DTOs, mappers and controllers:** request and response records, REST endpoints, status codes and `ResponseEntity` | |
+| 5 | **Service layer:** business rules, `@Transactional` boundaries, interface vs. implementation, and why the service owns the transaction, plus the DTOs and mappers it returns. Config: `jpa.open-in-view: false` | ✅ Done |
+| 6 | **Controllers:** REST endpoints, status codes, `ResponseEntity` and a shared `PageResponse` (DTOs and mappers moved to step 5) | ⏭️ Next |
 | 7 | **Validation and exception handling:** `@Valid`, custom messages, the global handler, and a consistent error response | |
 | 8 | **Testing:** unit tests (JUnit 5, Mockito, AssertJ), `@WebMvcTest` slices, and `@DataJpaTest`/`@SpringBootTest` with **Testcontainers** against real Postgres | |
 | 9 | **API docs and observability:** springdoc-openapi (Swagger UI), structured logging with SLF4J, a correlation-id MDC filter, and Actuator endpoints. Config: `logging.level.*`, `management.endpoints.web.exposure` | |
@@ -76,16 +76,18 @@ The phases for later steps are a **draft**. They get refined at the start of eac
 - [x] **4.4 N+1:** turn on SQL logging in the dev profile, reproduce N+1, then fix it with `@EntityGraph` or `JOIN FETCH`.
 
 ### Step 5: Service layer
-- [ ] **5.1 `TaskListService`:** interface + implementation for CRUD, and `ResourceNotFoundException` in `common/`.
-- [ ] **5.2 `TaskService`:** CRUD scoped to a list, plus changing the status.
-- [ ] **5.3 Transactions:** `@Transactional` boundaries, `readOnly`, dirty checking (updates with no `save()` call), and `open-in-view: false`.
+Refined before starting. Entities must not leave the service layer, so services return DTOs from the start: the DTOs and mappers move here from step 6. Services are concrete classes, with no interface + `Impl` pair: there's one implementation, Spring can proxy a class for `@Transactional`, and Mockito can mock a class.
+- [x] **5.1 Groundwork:** `ResourceNotFoundException` in `common/`, and `jpa.open-in-view: false` (what it does and why it's turned off).
+- [x] **5.2 TaskList DTOs and mapper:** `CreateTaskListRequest`, `UpdateTaskListRequest` and `TaskListResponse` records, plus a hand-written `TaskListMapper`.
+- [x] **5.3 `TaskListService`:** CRUD with `@Transactional` boundaries, `readOnly` for reads, and dirty checking (updates with no `save()` call).
+- [x] **5.4 Task DTOs and mapper:** `CreateTaskRequest`, `UpdateTaskRequest`, `UpdateTaskStatusRequest` and `TaskResponse` records, plus `TaskMapper`.
+- [x] **5.5 `TaskService`:** CRUD scoped to a list, the filtered and paged listing (specifications from 4.3), and changing the status.
 
-### Step 6: DTOs, mappers and controllers
-- [ ] **6.1 DTOs:** request and response records for both features, plus a shared `PageResponse`.
-- [ ] **6.2 Mappers:** hand-written `TaskListMapper` and `TaskMapper`.
-- [ ] **6.3 `TaskListController`:** CRUD endpoints, status codes, `ResponseEntity`, and the `Location` header on create.
-- [ ] **6.4 `TaskController`:** nested endpoints, `PATCH …/status`, and pagination and filter parameters.
-- [ ] **6.5 Exercise the API:** an `.http` file covering every endpoint.
+### Step 6: Controllers
+- [ ] **6.1 `PageResponse`:** a shared record in `common/`, so the API doesn't expose Spring's `Page` JSON.
+- [ ] **6.2 `TaskListController`:** CRUD endpoints, status codes, `ResponseEntity`, and the `Location` header on create.
+- [ ] **6.3 `TaskController`:** nested endpoints, `PATCH …/status`, and pagination and filter parameters.
+- [ ] **6.4 Exercise the API:** an `.http` file covering every endpoint.
 
 ### Step 7: Validation and exception handling
 - [ ] **7.1 Bean Validation:** constraints on the request records, `@Valid`, and custom messages.
@@ -176,6 +178,21 @@ The phases for later steps are a **draft**. They get refined at the start of eac
 - Notes: `docs/notes/05-repositories.pdf` (repositories, free methods, `save`, transactions, `Optional`).
 - Verified: `./mvnw clean verify` passes (3 tests). A temporary check confirmed every filter combination and the list scoping, then was deleted.
 - Trade-off noted: specification attribute names are strings; a generated metamodel (`Task_.status`) could make them type-safe later.
+
+## Step 5: what was done
+
+- `common/ResourceNotFoundException` (unchecked, so it also triggers rollback). Step 7 maps it to 404.
+- `jpa.open-in-view: false` in `application.yaml`: the session closes with the service transaction, so lazy data must be read inside services. The startup warning is gone.
+- DTOs moved here from step 6, so entities never leave services. Records in `tasklist/dto` (`CreateTaskListRequest`, `UpdateTaskListRequest`, `TaskListResponse`) and `task/dto` (`CreateTaskRequest`, `UpdateTaskRequest`, `UpdateTaskStatusRequest`, `TaskResponse`).
+  - PUT replaces the editable fields. A missing task priority resets to MEDIUM. Status changes only through `UpdateTaskStatusRequest`.
+  - `TaskListResponse` has no tasks (own paged endpoint, avoids N+1). `TaskResponse` has `taskListId`, read from the lazy proxy without a query.
+- Hand-written `@Component` mappers: `TaskListMapper` and `TaskMapper` (`toEntity`, `updateEntity`, `toResponse`).
+- `TaskListService` and `TaskService` are concrete classes (no interface + `Impl`), with `@Transactional(readOnly = true)` on the class and plain `@Transactional` on writes.
+  - Updates use dirty checking (setters, no `save()`).
+  - **Gotcha found:** `@CreationTimestamp`/`@UpdateTimestamp` are only set when the SQL is sent, so the response had null timestamps. Fixed with `saveAndFlush` on create and `flush()` on update.
+  - Deletes load first, so a missing id is a 404 (`deleteById` ignores it). A task is deleted directly, not with `removeTask`, which would load all of the list's tasks.
+  - `TaskService` scopes every call to the list id; listing tasks of an unknown list is a 404, not an empty page.
+- Verified: `./mvnw clean verify` passes. Temporary checks against the dev DB covered every service method, the 404 cases and the cascade, then were deleted along with their data.
 
 ## Verification (each step)
 
