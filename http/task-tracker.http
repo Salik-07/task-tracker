@@ -1,0 +1,108 @@
+### Task Tracker API: every endpoint, in order.
+# IntelliJ: pick the "dev" environment at the top of the editor, then click ▶ next to
+# each request, top to bottom. The {% ... %} scripts save ids from responses into
+# variables ({{listId}}, {{taskId}}) that the later requests use.
+# Needs the app running with the dev profile.
+
+### ---------- Task lists ----------
+
+### Create a list -> 201, Location header
+POST {{baseUrl}}/task-lists
+Content-Type: application/json
+
+{
+  "title": "Groceries",
+  "description": "Weekly shopping"
+}
+
+> {%
+    client.global.set("listId", response.body.id);
+    client.test("201 Created", () => client.assert(response.status === 201));
+%}
+
+### List all lists (paged) -> 200
+GET {{baseUrl}}/task-lists?page=0&size=20&sort=title,asc
+
+### Get one list -> 200
+GET {{baseUrl}}/task-lists/{{listId}}
+
+### Update a list (PUT replaces title and description) -> 200
+PUT {{baseUrl}}/task-lists/{{listId}}
+Content-Type: application/json
+
+{
+  "title": "Groceries (this week)",
+  "description": "Weekly shopping"
+}
+
+### ---------- Tasks ----------
+
+### Create a task -> 201
+POST {{baseUrl}}/task-lists/{{listId}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Buy milk",
+  "dueDate": "2026-12-31",
+  "priority": "HIGH"
+}
+
+> {%
+    client.global.set("taskId", response.body.id);
+    client.test("201 Created", () => client.assert(response.status === 201));
+%}
+
+### Create a second task (no priority -> MEDIUM) -> 201
+POST {{baseUrl}}/task-lists/{{listId}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Buy eggs"
+}
+
+### List tasks (paged) -> 200
+GET {{baseUrl}}/task-lists/{{listId}}/tasks?page=0&size=20&sort=dueDate,asc
+
+### Filter by priority -> only HIGH tasks
+GET {{baseUrl}}/task-lists/{{listId}}/tasks?priority=HIGH
+
+### Get one task -> 200
+GET {{baseUrl}}/task-lists/{{listId}}/tasks/{{taskId}}
+
+### Update a task (PUT: fields left out are cleared, priority resets to MEDIUM) -> 200
+PUT {{baseUrl}}/task-lists/{{listId}}/tasks/{{taskId}}
+Content-Type: application/json
+
+{
+  "title": "Buy oat milk",
+  "description": "The barista one",
+  "dueDate": "2026-12-30",
+  "priority": "HIGH"
+}
+
+### Complete a task (PATCH only the status) -> 200
+PATCH {{baseUrl}}/task-lists/{{listId}}/tasks/{{taskId}}/status
+Content-Type: application/json
+
+{
+  "status": "COMPLETED"
+}
+
+### Filter by status -> only OPEN tasks ("Buy eggs")
+GET {{baseUrl}}/task-lists/{{listId}}/tasks?status=OPEN
+
+### ---------- Errors (improved in step 7) ----------
+
+### Unknown enum value -> 400 (values are case-sensitive)
+GET {{baseUrl}}/task-lists/{{listId}}/tasks?status=open
+
+### Missing list -> 500 today, 404 after step 7
+GET {{baseUrl}}/task-lists/00000000-0000-0000-0000-000000000000
+
+### ---------- Clean up ----------
+
+### Delete a task -> 204
+DELETE {{baseUrl}}/task-lists/{{listId}}/tasks/{{taskId}}
+
+### Delete the list (its other tasks go with it) -> 204
+DELETE {{baseUrl}}/task-lists/{{listId}}

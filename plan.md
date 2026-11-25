@@ -48,7 +48,7 @@ A senior MERN/MEAN engineer is learning the Java ecosystem. The goal is a produc
 | 3 | **Schema and entities:** Flyway `V1__init.sql` (tables, foreign key, indexes, check constraints), the JPA entities, entity lifecycle, lazy loading, and auditing (`@CreationTimestamp` vs. Spring Data auditing). Config: `jpa.hibernate.ddl-auto: validate` | ✅ Done |
 | 4 | **Repositories:** Spring Data interfaces, derived queries, pagination, and the N+1 problem with how to avoid it | ✅ Done |
 | 5 | **Service layer:** business rules, `@Transactional` boundaries, interface vs. implementation, and why the service owns the transaction, plus the DTOs and mappers it returns. Config: `jpa.open-in-view: false` | ✅ Done |
-| 6 | **Controllers:** REST endpoints, status codes, `ResponseEntity` and a shared `PageResponse` (DTOs and mappers moved to step 5) | ⏭️ Next |
+| 6 | **Controllers:** REST endpoints, status codes, `ResponseEntity` and a shared `PageResponse` (DTOs and mappers moved to step 5) | 🔄 In progress (6.4 to validate) |
 | 7 | **Validation and exception handling:** `@Valid`, custom messages, the global handler, and a consistent error response | |
 | 8 | **Testing:** unit tests (JUnit 5, Mockito, AssertJ), `@WebMvcTest` slices, and `@DataJpaTest`/`@SpringBootTest` with **Testcontainers** against real Postgres | |
 | 9 | **API docs and observability:** springdoc-openapi (Swagger UI), structured logging with SLF4J, a correlation-id MDC filter, and Actuator endpoints. Config: `logging.level.*`, `management.endpoints.web.exposure` | |
@@ -84,9 +84,9 @@ Refined before starting. Entities must not leave the service layer, so services 
 - [x] **5.5 `TaskService`:** CRUD scoped to a list, the filtered and paged listing (specifications from 4.3), and changing the status.
 
 ### Step 6: Controllers
-- [ ] **6.1 `PageResponse`:** a shared record in `common/`, so the API doesn't expose Spring's `Page` JSON.
-- [ ] **6.2 `TaskListController`:** CRUD endpoints, status codes, `ResponseEntity`, and the `Location` header on create.
-- [ ] **6.3 `TaskController`:** nested endpoints, `PATCH …/status`, and pagination and filter parameters.
+- [x] **6.1 `PageResponse`:** a shared record in `common/`, so the API doesn't expose Spring's `Page` JSON.
+- [x] **6.2 `TaskListController`:** CRUD endpoints, status codes, `ResponseEntity`, and the `Location` header on create.
+- [x] **6.3 `TaskController`:** nested endpoints, `PATCH …/status`, and pagination and filter parameters.
 - [ ] **6.4 Exercise the API:** an `.http` file covering every endpoint.
 
 ### Step 7: Validation and exception handling
@@ -193,6 +193,16 @@ Refined before starting. Entities must not leave the service layer, so services 
   - Deletes load first, so a missing id is a 404 (`deleteById` ignores it). A task is deleted directly, not with `removeTask`, which would load all of the list's tasks.
   - `TaskService` scopes every call to the list id; listing tasks of an unknown list is a 404, not an empty page.
 - Verified: `./mvnw clean verify` passes. Temporary checks against the dev DB covered every service method, the 404 cases and the cascade, then were deleted along with their data.
+
+## Step 6: what was done (so far)
+
+- `common/PageResponse<T>` (`content`, `page`, `size`, `totalElements`, `totalPages`) instead of serializing Spring's `Page`.
+- `TaskListController` at `/api/v1/task-lists`: POST gives 201 + `Location` (built with `ServletUriComponentsBuilder.fromCurrentRequest()`), GET (paged, default 20 newest first), GET by id, PUT, DELETE gives 204.
+- `TaskController` at `/api/v1/task-lists/{taskListId}/tasks`: same pattern, plus optional `status` and `priority` query filters and `PATCH /{taskId}/status`.
+- Config: `spring.data.web.pageable.max-page-size: 100`.
+- `http/task-tracker.http` and `http/http-client.env.json` (dev `baseUrl`) for IntelliJ's HTTP client; ids are passed between requests with response scripts. **Not run yet: the owner will validate it.**
+- Verified with curl on port 8089: every endpoint and status code, the filters, and a 400 for an unknown enum value.
+- Known gaps for step 7: a missing id and an unknown `sort` field give 500, and request bodies aren't validated.
 
 ## Verification (each step)
 

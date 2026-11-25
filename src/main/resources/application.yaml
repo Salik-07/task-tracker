@@ -19,3 +19,10 @@ spring:
     # transaction then fails fast (LazyInitializationException) instead of quietly
     # running extra queries from the controller or JSON serializer.
     open-in-view: false
+
+  data:
+    web:
+      pageable:
+        # Caps ?size= so a client can't ask for millions of rows in one page.
+        # (Spring's default cap is 2000.) Larger values are lowered to this.
+        max-page-size: 100
