@@ -5,6 +5,7 @@ import com.example.tasktracker.task.dto.CreateTaskRequest;
 import com.example.tasktracker.task.dto.TaskResponse;
 import com.example.tasktracker.task.dto.UpdateTaskRequest;
 import com.example.tasktracker.task.dto.UpdateTaskStatusRequest;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -30,7 +31,8 @@ import java.util.UUID;
  * HTTP layer for tasks. Tasks are nested under their list in the URL, so every
  * endpoint gets {taskListId} from the base path; the service uses it to scope
  * every query to that list.
- * Same conventions as TaskListController. Validation and 404s come in step 7.
+ * Same conventions as TaskListController, including @Valid on request bodies.
+ * 404s and field errors in the response body come in 7.2.
  */
 @RestController
 @RequestMapping("/api/v1/task-lists/{taskListId}/tasks")
@@ -45,7 +47,7 @@ public class TaskController {
     // POST .../tasks -> 201 Created, Location: .../tasks/{taskId}, body = the new task
     @PostMapping
     public ResponseEntity<TaskResponse> create(@PathVariable UUID taskListId,
-                                               @RequestBody CreateTaskRequest request) {
+                                               @Valid @RequestBody CreateTaskRequest request) {
         TaskResponse created = taskService.create(taskListId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()  // .../task-lists/{taskListId}/tasks
                 .path("/{taskId}")
@@ -75,7 +77,7 @@ public class TaskController {
     // PUT .../tasks/{taskId} -> 200. Replaces title, description, dueDate and priority.
     @PutMapping("/{taskId}")
     public TaskResponse update(@PathVariable UUID taskListId, @PathVariable UUID taskId,
-                               @RequestBody UpdateTaskRequest request) {
+                               @Valid @RequestBody UpdateTaskRequest request) {
         return taskService.update(taskListId, taskId, request);
     }
 
@@ -83,7 +85,7 @@ public class TaskController {
     // here only the status: {"status": "COMPLETED"}.
     @PatchMapping("/{taskId}/status")
     public TaskResponse updateStatus(@PathVariable UUID taskListId, @PathVariable UUID taskId,
-                                     @RequestBody UpdateTaskStatusRequest request) {
+                                     @Valid @RequestBody UpdateTaskStatusRequest request) {
         return taskService.updateStatus(taskListId, taskId, request);
     }
 

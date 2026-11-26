@@ -49,8 +49,8 @@ A senior MERN/MEAN engineer is learning the Java ecosystem. The goal is a produc
 | 4 | **Repositories:** Spring Data interfaces, derived queries, pagination, and the N+1 problem with how to avoid it | ✅ Done |
 | 5 | **Service layer:** business rules, `@Transactional` boundaries, interface vs. implementation, and why the service owns the transaction, plus the DTOs and mappers it returns. Config: `jpa.open-in-view: false` | ✅ Done |
 | 6 | **Controllers:** REST endpoints, status codes, `ResponseEntity` and a shared `PageResponse` (DTOs and mappers moved to step 5) | 🔄 In progress (6.4 to validate) |
-| 7 | **Validation and exception handling:** `@Valid`, custom messages, the global handler, and a consistent error response | |
-| 8 | **Testing:** unit tests (JUnit 5, Mockito, AssertJ), `@WebMvcTest` slices, and `@DataJpaTest`/`@SpringBootTest` with **Testcontainers** against real Postgres | |
+| 7 | **Validation and exception handling:** `@Valid`, custom messages, the global handler, and a consistent error response | ✅ Done |
+| 8 | **Testing:** unit tests (JUnit 5, Mockito, AssertJ), `@WebMvcTest` slices, and `@DataJpaTest`/`@SpringBootTest` with **Testcontainers** against real Postgres | ⏭️ Next |
 | 9 | **API docs and observability:** springdoc-openapi (Swagger UI), structured logging with SLF4J, a correlation-id MDC filter, and Actuator endpoints. Config: `logging.level.*`, `management.endpoints.web.exposure` | |
 | 10 | **Security:** Spring Security, user registration and login, JWT (access and refresh tokens), role-based authorization, and per-user ownership of task lists | |
 | 11 | **Containerize and CI:** multi-stage Dockerfile (or Buildpacks), the app added to compose, and a GitHub Actions build and test pipeline. Config: `POSTGRES_HOST` (database host on the Docker network) | |
@@ -90,9 +90,9 @@ Refined before starting. Entities must not leave the service layer, so services 
 - [ ] **6.4 Exercise the API:** an `.http` file covering every endpoint.
 
 ### Step 7: Validation and exception handling
-- [ ] **7.1 Bean Validation:** constraints on the request records, `@Valid`, and custom messages.
-- [ ] **7.2 Global handler:** `@RestControllerAdvice` returning `ProblemDetail` for not found (404) and validation errors (400, with field errors).
-- [ ] **7.3 Edge cases:** malformed JSON, a bad UUID or enum in the path or query, database constraint violations, and a safe catch-all 500.
+- [x] **7.1 Bean Validation:** constraints on the request records, `@Valid`, and custom messages.
+- [x] **7.2 Global handler:** `@RestControllerAdvice` returning `ProblemDetail` for not found (404) and validation errors (400, with field errors).
+- [x] **7.3 Edge cases:** malformed JSON, a bad UUID or enum in the path or query, an unknown `sort` field, database constraint violations, and a safe catch-all 500.
 
 ### Step 8: Testing
 - [ ] **8.1 Service unit tests:** JUnit 5, Mockito and AssertJ, with no Spring context.
@@ -203,6 +203,22 @@ Refined before starting. Entities must not leave the service layer, so services 
 - `http/task-tracker.http` and `http/http-client.env.json` (dev `baseUrl`) for IntelliJ's HTTP client; ids are passed between requests with response scripts. **Not run yet: the owner will validate it.**
 - Verified with curl on port 8089: every endpoint and status code, the filters, and a 400 for an unknown enum value.
 - Known gaps for step 7: a missing id and an unknown `sort` field give 500, and request bodies aren't validated.
+
+## Step 7: what was done
+
+- **7.1 Bean Validation** on the request records: `@NotBlank` + `@Size(max = 255)` on titles, `@Size(max = 2000)` on descriptions (our cap; the column is `text`), `@FutureOrPresent` on `dueDate` in `CreateTaskRequest` only, `@NotNull` on the PATCH status. Custom messages inline (`message = "..."`). `@Valid @RequestBody` in both controllers turns the checks on.
+- **7.2 `common/GlobalExceptionHandler`** (`@RestControllerAdvice`, extends `ResponseEntityExceptionHandler`). Every error is a `ProblemDetail` (RFC 9457, `application/problem+json`).
+  - `ResourceNotFoundException` gives 404.
+  - Validation errors give 400 with `title: "Validation failed"` and an `errors` list of `{field, message}`, sorted by field.
+  - Spring 7 doesn't fill `instance`, and leaves out `type` when it's `about:blank`.
+- **7.3 Edge cases:**
+  - Unreadable body gives 400 with a useful detail: the field and value, plus allowed values for enums (Jackson 3 `InvalidFormatException`), or "not valid JSON".
+  - `?sort=foo` (`PropertyReferenceException`, now in `org.springframework.data.core`) gives 400 instead of 500.
+  - `DataIntegrityViolationException` gives 409 with a generic message; the SQL error is logged only.
+  - Catch-all `Exception` gives 500 "An unexpected error occurred."; the stack trace is logged only.
+  - Already handled by the base class: bad UUID or enum in the path or query (400), unknown URL (404), wrong method (405).
+- Notes: `docs/notes/06-validation-errors.pdf` (4 pages: request journey, rules, `@Valid`, the handler, ProblemDetail, edge cases, which handler wins, safe errors).
+- Verified with curl on port 8089: every 400 case, the 404, and that valid requests still work. **Not triggered by hand:** the 409 and the catch-all 500; they get tests in step 8.
 
 ## Verification (each step)
 

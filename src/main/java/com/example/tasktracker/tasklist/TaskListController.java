@@ -4,6 +4,7 @@ import com.example.tasktracker.common.PageResponse;
 import com.example.tasktracker.tasklist.dto.CreateTaskListRequest;
 import com.example.tasktracker.tasklist.dto.TaskListResponse;
 import com.example.tasktracker.tasklist.dto.UpdateTaskListRequest;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -28,7 +29,12 @@ import java.util.UUID;
  * no business logic, no transactions, no entities.
  * <p>
  * @RestController = @Controller + @ResponseBody: return values are written as JSON.
- * Validation (@Valid) and error responses (404 instead of 500) come in step 7.
+ * @Valid on a @RequestBody runs the Bean Validation rules on the record before the
+ * method body; if any fail, Spring answers 400 and the method never runs.
+ * Why it's needed: the rules on the record (@NotBlank, @Size...) only describe what
+ * is valid; on their own they never run. @Valid says "check them here". Without it,
+ * {"title":"   "} would reach the service and fail in Postgres with a 500.
+ * Error responses (404 instead of 500, field errors in the body) come in 7.2.
  */
 @RestController
 @RequestMapping("/api/v1/task-lists")
@@ -44,7 +50,7 @@ public class TaskListController {
     // REST convention: a POST tells the client where the new resource lives (the
     // Location header), so the client can GET it there.
     @PostMapping
-    public ResponseEntity<TaskListResponse> create(@RequestBody CreateTaskListRequest request) {
+    public ResponseEntity<TaskListResponse> create(@Valid @RequestBody CreateTaskListRequest request) {
         TaskListResponse created = taskListService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()  // the URL just called, e.g. http://localhost:8080/api/v1/task-lists (no hard-coded host or port)
                 .path("/{id}")                                           // add "/{id}" to the end
@@ -70,7 +76,7 @@ public class TaskListController {
 
     // PUT /api/v1/task-lists/{id} -> 200 with the updated list
     @PutMapping("/{id}")
-    public TaskListResponse update(@PathVariable UUID id, @RequestBody UpdateTaskListRequest request) {
+    public TaskListResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateTaskListRequest request) {
         return taskListService.update(id, request);
     }
 
